@@ -1,0 +1,75 @@
+stages:
+  - build
+  - deploy
+
+dummy:
+  stage: build
+  tags:
+    - me4d
+  script:
+    - echo "dummy job"
+
+build_frontend_dev:
+  stage: build
+  tags:
+    - docker
+  image: "node:fermium-alpine"
+  script:
+    - echo -e "start building frontend"
+    - cd vue_frontend/
+    - npm install
+    - npm run build $CI_COMMIT_BRANCH
+  artifacts:
+    paths:
+      - dashboard/static/vue/
+      - vue_frontend/webpack-stats.json
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+
+build_frontend_main:
+  stage: build
+  tags:
+    - docker
+  image: "node:fermium-alpine"
+  script:
+    - echo -e "start building frontend"
+    - cd vue_frontend/
+    - npm install
+    - npm run build $CI_COMMIT_BRANCH
+  artifacts:
+    paths:
+      - dashboard/static/vue/
+      - vue_frontend/webpack-stats.json
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy_main:
+  stage: deploy
+  dependencies: ["build_frontend_main"]
+  tags:
+    - denguethai
+  services:
+    - docker:dind
+  script:
+    - echo -e "migrations and superuser creation needs to be done manually"
+    - echo -e "in case docker instances are already running:"
+    - docker-compose --env-file ./dev.env -f production.yml -p ddashboard down
+    - docker-compose --env-file ./dev.env -f production.yml -p ddasboard up --build -d
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy_dev:
+  stage: deploy
+  dependencies: ["build_frontend_dev"]
+  tags:
+    - me4d
+  services:
+    - docker:dind
+  script:
+    - ls -R
+    - echo -e "migrations and superuser creation needs to be done manually"
+    - echo -e "in case docker instances are already running:"
+    - docker-compose --env-file ./dev.env -f production.yml -p ddashboard down
+    - docker-compose --env-file ./dev.env -f production.yml -p ddashboard up --build -d
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
